@@ -3,7 +3,12 @@ export const ENV = {
 
   cookieSecret: process.env.JWT_SECRET || "",
 
-  databaseUrl: process.env.DATABASE_URL || "",
+  databaseUrl:
+    process.env.DATABASE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.MYSQL_PRIVATE_URL ||
+    process.env.MYSQL_PUBLIC_URL ||
+    "",
 
   oAuthServerUrl: process.env.OAUTH_SERVER_URL || "",
 

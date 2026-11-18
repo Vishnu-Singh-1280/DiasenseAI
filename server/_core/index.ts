@@ -21,7 +21,7 @@ function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
 
-    server.listen(port, () => {
+    server.listen(port, "0.0.0.0", () => {
       server.close(() => resolve(true));
     });
 
@@ -32,6 +32,10 @@ function isPortAvailable(port: number): Promise<boolean> {
 async function findAvailablePort(
   startPort: number = 3000
 ): Promise<number> {
+  if (process.env.PORT && process.env.NODE_ENV === "production") {
+    return parseInt(process.env.PORT, 10);
+  }
+
   for (let port = startPort; port < startPort + 20; port++) {
     if (await isPortAvailable(port)) {
       return port;
@@ -89,9 +93,9 @@ async function startServer() {
     );
   }
 
-  server.listen(port, () => {
+  server.listen(port, "0.0.0.0", () => {
     console.log(
-      `Server running on http://localhost:${port}/`
+      `Server running on http://0.0.0.0:${port}/`
     );
   });
 }
