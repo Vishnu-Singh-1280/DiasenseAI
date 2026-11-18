@@ -1,0 +1,7 @@
+node_modules
+.git
+.github
+.venv
+.manus-logs
+dist
+.env

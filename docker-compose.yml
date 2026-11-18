@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: diasense-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: diasense_password_123
+      MYSQL_DATABASE: diasense_ai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  app:
+    build: .
+    container_name: diasense-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=mysql://root:diasense_password_123@mysql:3306/diasense_ai
+      - JWT_SECRET=diasense_ai_secure_jwt_secret_production_2026
+      - OWNER_OPEN_ID=local-admin
+    depends_on:
+      - mysql
+
+volumes:
+  mysql_data:
