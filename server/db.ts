@@ -113,7 +113,7 @@ export async function createAssessment(input: any) {
 export async function getAssessmentsByUser(userId: number) {
   const db = await getDb();
   if (!db) return localDb.getAssessmentsByUser(userId);
-  return db.select().from(assessments).where(eq(assessments.userId, userId)).orderBy(desc(assessments.createdAt));
+  return db.select().from(assessments).where(eq(assessments.userId,userId)).orderBy(desc(assessments.createdAt));
 }
 
 export async function upsertProfile(input: any) {
@@ -199,17 +199,17 @@ export async function getReportDownloadUrl(userId: number, reportId: string) {
 export async function getLatestAssessmentBundle(userId: number) {
   const db = await getDb();
   if (!db) return localDb.getLatestAssessmentBundle(userId);
-  const assessment = (await db.select().from(assessments).where(eq(assessments.userId, userId)).orderBy(desc(assessments.createdAt)).limit(1))[0];
+  const assessment = (await db.select().from(assessments).where(eq(assessments.userId,userId)).orderBy(desc(assessments.createdAt)).limit(1))[0];
   if (!assessment) return undefined;
   const prediction = (await db.select().from(predictions).where(eq(predictions.assessmentId, assessment.id)).orderBy(desc(predictions.createdAt)).limit(1))[0];
   const recommendation = prediction ? (await db.select().from(recommendations).where(eq(recommendations.predictionId, prediction.id)).limit(1))[0] : undefined;
   return { assessment, prediction, recommendation };
 }
 
-export async function getDashboardSummary(userId: number) {
+export async function getDashboardSummary(userId:number) {
   const db = await getDb();
   if (!db) return localDb.getDashboardSummary(userId);
-  const rows = await db.select({ assessmentId: assessments.id, bmi: assessments.bmi, activity: assessments.activity, createdAt: assessments.createdAt, riskPercentage: predictions.riskPercentage, confidence: predictions.confidence, healthScore: predictions.healthScore, category: predictions.category }).from(assessments).innerJoin(predictions, eq(predictions.assessmentId, assessments.id)).where(eq(assessments.userId, userId)).orderBy(desc(assessments.createdAt)).limit(12);
+  const rows = await db.select({ assessmentId: assessments.id, bmi: assessments.bmi, activity: assessments.activity, createdAt: assessments.createdAt, riskPercentage: predictions.riskPercentage, confidence: predictions.confidence, healthScore: predictions.healthScore, category: predictions.category }).from(assessments).innerJoin(predictions, eq(predictions.assessmentId, assessments.id)).where(eq(assessments.userId,userId)).orderBy(desc(assessments.createdAt)).limit(12);
   const history = rows.map(row => ({ id: row.assessmentId, riskPercentage: Number(row.riskPercentage), confidence: Number(row.confidence), healthScore: Number(row.healthScore), category: row.category, bmi: Number(row.bmi), activity: row.activity, createdAt: row.createdAt }));
   return { latest: history[0] ?? null, history };
 }

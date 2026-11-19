@@ -283,7 +283,7 @@ export default function Assistant() {
       id: "intro",
       role: "assistant",
       content:
-        "I’m your DiaSense AI Health Assistant. Ask me anything about your diabetes assessment, personalized diet plans, blood pressure, blood glucose, medicines, or healthy lifestyle.",
+        "I’m your DiaSense AI Assistant. You can ask me anything about your diabetes assessment, personalized diet plans, symptoms, or any general knowledge, study tips, science, and everyday questions!",
     },
   ]);
 
@@ -449,10 +449,10 @@ export default function Assistant() {
           <section className="panel bracket p-6 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="eyebrow">AI health assistant</div>
-                <h1 className="mt-3 text-3xl font-bold text-white">Ask about your health.</h1>
+                <div className="eyebrow">AI Assistant</div>
+                <h1 className="mt-3 text-3xl font-bold text-white">Ask anything.</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                  Ask about your DiaSense assessment, personalized diet & meal plans, blood pressure, diabetes, symptoms, exercises, and medicines.
+                  Ask about health, diabetes assessments, personalized diet plans, symptoms, or general knowledge, study, daily questions, and advice.
                 </p>
               </div>
               <Stethoscope className="shrink-0 text-cyan-300" size={26} />
@@ -493,7 +493,7 @@ export default function Assistant() {
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Ask in English or Hinglish (e.g. mera diet plan kya hona chahiye?)..."
+                placeholder="Ask in English or Hinglish (e.g. mera diet plan, general knowledge, study tips)..."
                 className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
               />
               <button

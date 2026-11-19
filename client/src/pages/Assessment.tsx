@@ -36,7 +36,6 @@ export default function Assessment() {
   const [pregnancyStatus, setPregnancyStatus] =
     useState<"no" | "yes" | "unknown">("no");
 
-  const [pregnancies, setPregnancies] = useState("0");
   const [skinThickness, setSkinThickness] = useState("");
 
   // Kept for ML/prediction compatibility.
@@ -221,8 +220,6 @@ export default function Assessment() {
         bloodPressure: parseDiastolicPressure(bloodPressure),
         glucose: optionalPositiveNumber(glucose),
 
-        // Pregnancies is only applicable to female profile.
-        pregnancies: gender === "female" ? Number(pregnancies) : 0,
 
         skinThickness: optionalPositiveNumber(skinThickness),
 
@@ -402,22 +399,6 @@ export default function Assessment() {
                     />
                   </label>
 
-                  {/* Pregnancies - FEMALE ONLY */}
-                  {gender === "female" && (
-                    <label className="text-sm text-slate-300">
-                      Pregnancies
-                      <input
-                        className={field}
-                        value={pregnancies}
-                        onChange={(event) =>
-                          setPregnancies(event.target.value)
-                        }
-                        type="number"
-                        min="0"
-                        max="30"
-                      />
-                    </label>
-                  )}
 
                   {/* Skin Thickness */}
                   <label className="text-sm text-slate-300">
@@ -472,8 +453,7 @@ export default function Assessment() {
                   </label>
 
                   {/* Pregnancy Status - FEMALE ONLY */}
-                  {gender === "female" && (
-                    <label className="text-sm text-slate-300">
+                  {gender === "female" && <label className="text-sm text-slate-300">
                       Pregnancy status
                       <select
                         className={field}
@@ -493,8 +473,7 @@ export default function Assessment() {
                           Prefer not to say
                         </option>
                       </select>
-                    </label>
-                  )}
+                    </label>}
                 </div>
 
                 <div className="mt-7 flex gap-2 rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-4 text-xs leading-5 text-slate-400">

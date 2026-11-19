@@ -520,25 +520,77 @@ function assessmentResponse(
   );
 }
 
+function greetingResponse(
+  hinglish: boolean,
+): string {
+  if (hinglish) {
+    return (
+      "- Namaste! Main DiaSense AI hoon, aapka smart assistant.\n" +
+      "- Main health, diabetes screening, personalized diet & fitness ke saath-saath general knowledge, study tips, technology, daily routine aur anya questions me bhi aapki madad kar sakta hoon.\n" +
+      "- Aap mujhse health ya kisi bhi general topic par koi bhi sawaal pooch sakte hain!"
+    );
+  }
+
+  return (
+    "- Hello! I am DiaSense AI, your personal intelligent assistant.\n" +
+    "- Along with health, diabetes screening, personalized nutrition, and fitness, I can also assist you with general knowledge, study strategies, technology, daily productivity, and everyday questions.\n" +
+    "- Feel free to ask me anything about your health or any general topic!"
+  );
+}
+
+function studyProductivityResponse(
+  hinglish: boolean,
+): string {
+  if (hinglish) {
+    return (
+      "- Study & Focus Strategy:\n" +
+      "- Pomodoro Technique use karein (25 min focused padhai + 5 min break).\n" +
+      "- Active Recall & Spaced Repetition se revision karein, sirf passive reading na karein.\n" +
+      "- Heavy distraction apps ko study hours me block karein.\n" +
+      "- Consistent routine rakhein aur daily 7-8 hours ki acchi neend zaroor lein taaki memory retention strong rahe."
+    );
+  }
+
+  return (
+    "- Study & Productivity Strategy:\n" +
+    "- Use the Pomodoro Technique: 25 minutes of deep focus followed by a 5-minute break.\n" +
+    "- Practice Active Recall and Spaced Repetition rather than passive re-reading.\n" +
+    "- Minimize phone and social media distractions during study blocks.\n" +
+    "- Maintain a steady daily schedule and prioritize 7-8 hours of sleep for memory consolidation."
+  );
+}
+
+function techGeneralResponse(
+  hinglish: boolean,
+): string {
+  if (hinglish) {
+    return (
+      "- Main technology, programming, science aur daily questions me bhi help kar sakta hoon.\n" +
+      "- Aap apna specific concept, code snippet, math problem ya topic share karein.\n" +
+      "- Main step-by-step aur easy-to-understand explanation provide karunga."
+    );
+  }
+
+  return (
+    "- I can assist with technology, programming, science, mathematics, and everyday topics.\n" +
+    "- Share the specific question, problem, code snippet, or topic you'd like to explore.\n" +
+    "- I will provide a clear, step-by-step explanation."
+  );
+}
+
 function generalResponse(
   hinglish: boolean,
 ): string {
   if (hinglish) {
     return (
-      "- Main health aur wellness ke general topics explain kar sakta hoon, including symptoms, nutrition, exercise, sleep, blood pressure, diabetes, heart health, medicines, vitamins aur lifestyle.\n" +
-      "- Aap apna exact symptom/topic, kitne time se hai, severity aur relevant measurements share karein.\n" +
-      "- Main general educational information de sakta hoon, lekin diagnosis nahi.\n" +
-      "- Prescription medicine ko bina qualified clinician ki advice ke start/stop/change na karein.\n" +
-      "- Agar aap specific question poochte hain to main us topic ke according detailed explanation dunga."
+      "- Main DiaSense AI hoon! Main health, diabetes risk, diet, exercise aur medicines ke saath-saath general knowledge, daily routine, study, science aur general topics par bhi aapki poori madad kar sakta hoon.\n" +
+      "- Aap health ya kisi bhi general topic par apna sawaal pooch sakte hain; main practical aur step-by-step guidance provide karunga."
     );
   }
 
   return (
-    "- I can explain many general health and wellness topics, including symptoms, nutrition, exercise, sleep, blood pressure, diabetes, heart health, medicines, vitamins, and lifestyle.\n" +
-    "- Share the exact symptom or topic, how long it has been present, its severity, and any relevant measurements.\n" +
-    "- I can provide general educational information, but I cannot diagnose you.\n" +
-    "- Do not start, stop, or change prescription medicines without appropriate clinical advice.\n" +
-    "- Ask a specific health question and I will explain it according to the topic."
+    "- I am DiaSense AI! Along with health, diabetes risk screening, personalized diet, and wellness, I can also assist you with general knowledge, study tips, science, daily productivity, and general topics.\n" +
+    "- Feel free to ask any health or general inquiry, and I'll be glad to help with practical, clear guidance."
   );
 }
 
@@ -828,8 +880,50 @@ export function getLocalHealthAnswer(
     };
   }
 
+  if (
+    /\b(hi|hello|hey|namaste|pranam|kaise ho|kya haal|who are you|tum kaun ho|aap kaun ho|intro|introduction)\b/i.test(
+      text,
+    )
+  ) {
+    return {
+      topic: "greeting",
+      emergency: false,
+      answer: greetingResponse(
+        hinglish,
+      ),
+    };
+  }
+
+  if (
+    /\b(study|padhai|exam|exams|focus|concentration|routine|time table|schedule|motivation|motivate|productive|productivity|career)\b/i.test(
+      text,
+    )
+  ) {
+    return {
+      topic: "study & productivity",
+      emergency: false,
+      answer: studyProductivityResponse(
+        hinglish,
+      ),
+    };
+  }
+
+  if (
+    /\b(tech|technology|coding|code|programming|computer|software|python|javascript|react|science|math|maths)\b/i.test(
+      text,
+    )
+  ) {
+    return {
+      topic: "technology & science",
+      emergency: false,
+      answer: techGeneralResponse(
+        hinglish,
+      ),
+    };
+  }
+
   return {
-    topic: "general health",
+    topic: "general assistance",
     emergency: false,
     answer: generalResponse(
       hinglish,

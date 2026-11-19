@@ -503,12 +503,7 @@ export const appRouter = router({
       }),
   }),
 
-  dashboard: router({
-    summary: protectedProcedure.query(
-      ({ ctx }) =>
-        getDashboardSummary(ctx.user.id)
-    ),
-  }),
+  dashboard: router({summary: protectedProcedure.query(({ctx})=>getDashboardSummary(ctx.user.id))}),
 
   profile: router({
     save: protectedProcedure
@@ -627,10 +622,7 @@ export const appRouter = router({
 
     generateLatest: protectedProcedure.mutation(
       async ({ ctx }) => {
-        const bundle =
-          await getLatestAssessmentBundle(
-            ctx.user.id
-          );
+        const bundle = await getLatestAssessmentBundle(ctx.user.id);
 
         if (!bundle?.prediction) {
           throw new TRPCError({
@@ -688,10 +680,7 @@ export const appRouter = router({
   assistant: router({
     status: protectedProcedure.query(
       async ({ ctx }) => {
-        const bundle =
-          await getLatestAssessmentBundle(
-            ctx.user.id
-          );
+        const bundle = await getLatestAssessmentBundle(ctx.user.id);
 
         const risk =
           bundle?.prediction?.riskPercentage;
@@ -754,12 +743,8 @@ export const appRouter = router({
 
         try {
           const result = await invokeLLM({
-            messages:
-              buildAssistantMessages({
-                context,
-                message: input.message,
-              }),
-            max_tokens: 450,
+            messages: buildAssistantMessages({context,message:input.message}),
+            max_tokens: 800,
           });
 
           const content =
