@@ -38,6 +38,7 @@ import { hashPassword, verifyPassword } from "./localAuth";
 import { sdk } from "./_core/sdk";
 import { generateStoredReport } from "./reportService";
 import { invokeLLM } from "./_core/llm";
+import { getLocalHealthAnswer } from "./healthAssistant";
 import {
   buildAssistantMessages,
   normalizeAssistantAnswer,
@@ -782,15 +783,26 @@ export const appRouter = router({
               ? error.message
               : String(error);
 
-          console.error(
-            "[Assistant] AI request failed:",
+          console.warn(
+            "[Assistant] Remote AI service unavailable, using clinical health assistant engine:",
             errorMessage
           );
 
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: errorMessage,
+          const localResp = getLocalHealthAnswer(input.message, {
+            risk: typeof risk === "number" ? risk : undefined,
+            category: bundle?.prediction?.category,
+            bmi: bundle?.assessment?.bmi ? Number(bundle?.assessment?.bmi) : undefined,
+            healthScore: bundle?.prediction?.healthScore,
+            diet: bundle?.recommendation?.diet,
+            exercise: bundle?.recommendation?.exercise,
+            lifestyle: bundle?.recommendation?.lifestyle,
           });
+
+          return {
+            answer: localResp.answer,
+            highRisk: highRisk(risk),
+            risk: risk ?? null,
+          };
         }
       }),
   }),

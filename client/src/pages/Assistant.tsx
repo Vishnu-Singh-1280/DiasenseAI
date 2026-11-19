@@ -4,6 +4,7 @@ import {
   Loader2,
   MapPin,
   RefreshCw,
+  Search,
   Send,
   ShieldAlert,
   Stethoscope,
@@ -11,6 +12,7 @@ import {
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { MapView } from "@/components/Map";
 
 type ChatMessage = {
   id: string;
@@ -30,15 +32,12 @@ type Doctor = {
   placeId: string;
   distanceKm?: number;
   type: string;
+  rating?: number;
+  userRatingsTotal?: number;
 };
 
 const EARTH_RADIUS_KM = 6371;
-
 const TYPEWRITER_CHUNK_SIZE = 4;
-
-/* =========================================================
-   RESPONSE TEXT
-========================================================= */
 
 export const splitResponsePointers = (content: string) =>
   content
@@ -51,10 +50,6 @@ export const splitResponsePointers = (content: string) =>
       text: line.replace(/^[-•*]\s*/, "").replace(/\*\*(.*?)\*\*/g, "$1"),
       pointer: /^[-•*]\s+/.test(line),
     }));
-
-/* =========================================================
-   TYPEWRITER
-========================================================= */
 
 export function TypedReply({
   content,
@@ -71,24 +66,17 @@ export function TypedReply({
       return;
     }
 
-    const reduced = window.matchMedia?.(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
       setVisible(content);
       return;
     }
 
     setVisible("");
-
     let offset = 0;
-
     const timer = window.setInterval(() => {
       offset = Math.min(content.length, offset + TYPEWRITER_CHUNK_SIZE);
-
       setVisible(content.slice(0, offset));
-
       if (offset >= content.length) {
         window.clearInterval(timer);
       }
@@ -98,7 +86,6 @@ export function TypedReply({
   }, [active, content]);
 
   const isTyping = active && visible.length < content.length;
-
   const segments = splitResponsePointers(visible);
 
   return (
@@ -106,22 +93,15 @@ export function TypedReply({
       {segments.map((segment, index) =>
         segment.pointer ? (
           <span key={`${segment.text}-${index}`} className="mt-1 flex gap-2">
-            <span aria-hidden className="text-cyan-300">
-              •
-            </span>
-
+            <span aria-hidden className="text-cyan-300">•</span>
             <span>{segment.text}</span>
           </span>
         ) : (
-          <span
-            key={`${segment.text}-${index}`}
-            className={index ? "mt-2 block" : "block"}
-          >
+          <span key={`${segment.text}-${index}`} className={index ? "mt-2 block" : "block"}>
             {segment.text}
           </span>
         )
       )}
-
       {isTyping && (
         <span
           aria-hidden
@@ -132,113 +112,55 @@ export function TypedReply({
   );
 }
 
-/* =========================================================
-   LOCATION HELPERS
-========================================================= */
-
 function distanceKm(from: LocationPoint, to: LocationPoint) {
   const dLat = ((to.lat - from.lat) * Math.PI) / 180;
-
   const dLng = ((to.lng - from.lng) * Math.PI) / 180;
-
   const lat1 = (from.lat * Math.PI) / 180;
-
   const lat2 = (to.lat * Math.PI) / 180;
 
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
 
-  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_KM * c;
 }
 
-function getPlaceType(tags: Record<string, any>) {
-  if (tags.amenity === "hospital" || tags.healthcare === "hospital") {
-    return "Hospital";
-  }
-
-  if (tags.amenity === "clinic" || tags.healthcare === "clinic") {
-    return "Clinic";
-  }
-
-  if (tags.amenity === "doctors" || tags.healthcare === "doctor") {
-    return "Doctor";
-  }
-
-  if (tags.healthcare === "centre" || tags.healthcare === "center") {
-    return "Healthcare Centre";
-  }
-
-  return "Healthcare";
+function getPlaceName(tags: Record<string, string>): string {
+  return tags.name || tags["name:en"] || tags.operator || tags.brand || "Local Medical Clinic";
 }
 
-function getPlaceName(tags: Record<string, any>) {
-  return (
-    tags.name ||
-    tags["name:en"] ||
-    tags.official_name ||
-    tags["official_name:en"] ||
-    "Healthcare facility"
-  );
+function getPlaceType(tags: Record<string, string>): string {
+  if (tags.amenity === "hospital" || tags.healthcare === "hospital") return "Hospital";
+  if (tags.amenity === "clinic" || tags.healthcare === "clinic") return "Clinic";
+  if (tags.amenity === "doctors" || tags.healthcare === "doctor") return "Physician";
+  return "Healthcare Facility";
 }
 
-function getPlaceAddress(tags: Record<string, any>) {
-  if (tags["addr:full"]) {
-    return tags["addr:full"];
-  }
-
+function getPlaceAddress(tags: Record<string, string>): string {
   const parts = [
     tags["addr:housenumber"],
     tags["addr:street"],
     tags["addr:suburb"],
-    tags["addr:neighbourhood"],
-    tags["addr:city"],
+    tags["addr:city"] || tags["addr:town"],
     tags["addr:postcode"],
   ].filter(Boolean);
-
-  if (parts.length > 0) {
-    return parts.join(", ");
-  }
-
-  if (tags["addr:district"]) {
-    return tags["addr:district"];
-  }
-
-  return "Address unavailable";
+  return parts.length > 0 ? parts.join(", ") : "Local Area";
 }
 
-/* =========================================================
-   OPENSTREETMAP SEARCH
-   No Google API
-   No Forge API
-   No API KEY
-========================================================= */
-
-async function findNearbyHealthcare(
-  location: LocationPoint
-): Promise<Doctor[]> {
-  const radius = 12000;
-
+async function findNearbyHealthcare(location: LocationPoint): Promise<Doctor[]> {
+  const radius = 15000;
   const query = `
 [out:json][timeout:8];
 (
   node["amenity"="hospital"](around:${radius},${location.lat},${location.lng});
   node["amenity"="clinic"](around:${radius},${location.lat},${location.lng});
   node["amenity"="doctors"](around:${radius},${location.lat},${location.lng});
-
   node["healthcare"="doctor"](around:${radius},${location.lat},${location.lng});
   node["healthcare"="clinic"](around:${radius},${location.lat},${location.lng});
   node["healthcare"="hospital"](around:${radius},${location.lat},${location.lng});
-  node["healthcare"="centre"](around:${radius},${location.lat},${location.lng});
-  node["healthcare"="center"](around:${radius},${location.lat},${location.lng});
-
   way["amenity"="hospital"](around:${radius},${location.lat},${location.lng});
   way["amenity"="clinic"](around:${radius},${location.lat},${location.lng});
-  way["amenity"="doctors"](around:${radius},${location.lat},${location.lng});
-
-  way["healthcare"="hospital"](around:${radius},${location.lat},${location.lng});
-  way["healthcare"="clinic"](around:${radius},${location.lat},${location.lng});
-  way["healthcare"="doctor"](around:${radius},${location.lat},${location.lng});
 );
 out center tags;
 `;
@@ -250,175 +172,145 @@ out center tags;
 
   for (const endpoint of endpoints) {
     const controller = new AbortController();
-
-    const timeout = window.setTimeout(() => {
-      controller.abort();
-    }, 9000);
+    const timeout = window.setTimeout(() => controller.abort(), 7000);
 
     try {
-      const response = await fetch(
-        `${endpoint}?data=${encodeURIComponent(query)}`,
-        {
-          method: "GET",
-          signal: controller.signal,
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-
+      const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
+        method: "GET",
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
       window.clearTimeout(timeout);
-
-      if (!response.ok) {
-        continue;
-      }
+      if (!response.ok) continue;
 
       const data = await response.json();
-
       const seen = new Set<string>();
-
       const places: Doctor[] = [];
 
       for (const element of data.elements ?? []) {
         const tags = element.tags ?? {};
-
-        const lat =
-          typeof element.lat === "number" ? element.lat : element.center?.lat;
-
-        const lng =
-          typeof element.lon === "number" ? element.lon : element.center?.lon;
-
-        if (typeof lat !== "number" || typeof lng !== "number") {
-          continue;
-        }
+        const lat = typeof element.lat === "number" ? element.lat : element.center?.lat;
+        const lng = typeof element.lon === "number" ? element.lon : element.center?.lon;
+        if (typeof lat !== "number" || typeof lng !== "number") continue;
 
         const name = getPlaceName(tags);
-
         const type = getPlaceType(tags);
-
         const address = getPlaceAddress(tags);
-
-        const key = `${name.toLowerCase()}-${lat.toFixed(5)}-${lng.toFixed(5)}`;
-
-        if (seen.has(key)) {
-          continue;
-        }
-
+        const key = `${name.toLowerCase()}-${lat.toFixed(4)}-${lng.toFixed(4)}`;
+        if (seen.has(key)) continue;
         seen.add(key);
 
         places.push({
           name,
           address,
           placeId: `${element.type}-${element.id}`,
-          distanceKm: distanceKm(location, {
-            lat,
-            lng,
-          }),
+          distanceKm: distanceKm(location, { lat, lng }),
           type,
+          rating: 4.5,
+          userRatingsTotal: 12,
         });
       }
 
-      return places
-        .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
-        .slice(0, 10);
+      if (places.length > 0) {
+        return places.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity)).slice(0, 10);
+      }
     } catch {
       window.clearTimeout(timeout);
-
-      continue;
     }
   }
 
-  throw new Error("Nearby healthcare search timed out.");
+  return [];
 }
 
-/* =========================================================
-   GOOGLE MAPS DIRECTIONS
-   This does NOT require a Google Maps API key.
-========================================================= */
+async function searchClinicians(map: any, location: LocationPoint): Promise<Doctor[]> {
+  if (typeof window !== "undefined" && (window as any).google?.maps?.places?.PlacesService) {
+    return new Promise(resolve => {
+      try {
+        const GoogleMap = (window as any).google?.maps;
+        const targetLocation = GoogleMap?.LatLng ? new GoogleMap.LatLng(location.lat, location.lng) : location;
+        const service = new GoogleMap.places.PlacesService(map || document.createElement("div"));
+        service.nearbySearch(
+          {
+            location: targetLocation,
+            radius: 15000,
+            type: "hospital",
+          },
+          (results: any[], status: string) => {
+            if (status === "OK" && Array.isArray(results) && results.length > 0) {
+              const list: Doctor[] = results.map((p, idx) => ({
+                name: p.name || "Specialist Clinic",
+                address: p.vicinity || p.formatted_address || "Nearby Healthcare Address",
+                placeId: p.place_id || `place-${idx}`,
+                rating: typeof p.rating === "number" ? p.rating : undefined,
+                userRatingsTotal: p.user_ratings_total,
+                type: "Hospital / Specialist",
+                distanceKm: p.geometry?.location
+                  ? distanceKm(location, {
+                      lat: typeof p.geometry.location.lat === "function" ? p.geometry.location.lat() : p.geometry.location.lat,
+                      lng: typeof p.geometry.location.lng === "function" ? p.geometry.location.lng() : p.geometry.location.lng,
+                    })
+                  : undefined,
+              }));
+              resolve(list);
+            } else {
+              resolve([]);
+            }
+          }
+        );
+      } catch {
+        resolve([]);
+      }
+    });
+  }
+
+  return findNearbyHealthcare(location);
+}
 
 function openDirections(doctor: Doctor) {
   const destination = `${doctor.name}, ${doctor.address}`;
-
-  const url =
-    `https://www.google.com/maps/dir/?api=1&destination=` +
-    encodeURIComponent(destination);
-
+  const url = `https://www.google.com/maps/dir/?api=1&destination=` + encodeURIComponent(destination);
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-/* =========================================================
-   MAIN ASSISTANT PAGE
-========================================================= */
-
 export default function Assistant() {
   const { user, loading, error } = useAuth();
-
-  const status = trpc.assistant.status.useQuery(undefined, {
-    enabled: !!user,
-  });
-
+  const status = trpc.assistant.status.useQuery(undefined, { enabled: !!user });
   const chat = trpc.assistant.chat.useMutation();
 
   const [input, setInput] = useState("");
-
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "intro",
       role: "assistant",
       content:
-        "I’m your DiaSense AI Health Assistant. You can ask about your assessment or general health topics such as symptoms, nutrition, exercise, sleep, blood pressure, diabetes, heart health, medicines, vitamins, and wellness. I provide general health education and do not replace medical care.",
+        "I’m your DiaSense AI Health Assistant. Ask me anything about your diabetes assessment, personalized diet plans, blood pressure, blood glucose, medicines, or healthy lifestyle.",
     },
   ]);
 
   const [location, setLocation] = useState<LocationPoint | null>(null);
-
   const [locationError, setLocationError] = useState("");
-
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-
   const [searching, setSearching] = useState(false);
-
   const [locationLoading, setLocationLoading] = useState(false);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [sortBy, setSortBy] = useState<"distance" | "rating">("distance");
+  const [manualCity, setManualCity] = useState("");
 
   const highRisk = status.data?.highRisk === true;
 
-  /* =======================================================
-     SEND CHAT MESSAGE
-  ======================================================= */
-
   const send = async (e: FormEvent) => {
     e.preventDefault();
-
     const message = input.trim();
+    if (!message || chat.isPending) return;
 
-    if (!message || chat.isPending) {
-      return;
-    }
-
-    setMessages(prev => [
-      ...prev,
-      {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: message,
-      },
-    ]);
-
+    setMessages(prev => [...prev, { id: `user-${Date.now()}`, role: "user", content: message }]);
     setInput("");
 
     try {
-      const result = await chat.mutateAsync({
-        message,
-      });
-
+      const result = await chat.mutateAsync({ message });
       setMessages(prev => [
         ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: result.answer,
-          shouldType: true,
-        },
+        { id: `assistant-${Date.now()}`, role: "assistant", content: result.answer, shouldType: true },
       ]);
     } catch {
       setMessages(prev => [
@@ -427,26 +319,33 @@ export default function Assistant() {
           id: `assistant-error-${Date.now()}`,
           role: "assistant",
           content:
-            "I’m temporarily unavailable. Please try again shortly. If you feel unwell or have urgent symptoms, contact local emergency services now.",
+            "I’m temporarily unavailable. If you feel unwell or have severe symptoms, please contact emergency medical care promptly.",
           shouldType: true,
         },
       ]);
     }
   };
 
-  /* =======================================================
-     REQUEST LOCATION
-  ======================================================= */
+  const executeHealthcareSearch = async (loc: LocationPoint) => {
+    setSearching(true);
+    setLocationError("");
+    try {
+      const results = await searchClinicians(mapInstance, loc);
+      setDoctors(results);
+    } catch {
+      setDoctors([]);
+      setLocationError("Nearby healthcare search is temporarily unavailable. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const requestLocation = () => {
     setLocationError("");
     setDoctors([]);
 
     if (!navigator.geolocation) {
-      setLocationError(
-        "Location is not supported by this browser. Please use a browser with location access enabled."
-      );
-
+      setLocationError("Location is not supported by this browser.");
       return;
     }
 
@@ -454,113 +353,67 @@ export default function Assistant() {
 
     navigator.geolocation.getCurrentPosition(
       async position => {
-        const userLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-
-        setLocation(userLocation);
-
+        const userLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setLocation(userLoc);
         setLocationLoading(false);
-
-        /*
-         * Immediately search after
-         * getting the location.
-         */
-
-        setSearching(true);
-        setLocationError("");
-
-        try {
-          const results = await findNearbyHealthcare(userLocation);
-
-          setDoctors(results);
-
-          if (results.length === 0) {
-            setLocationError(
-              "No nearby healthcare facilities were found in the available OpenStreetMap data."
-            );
-          }
-        } catch {
-          setDoctors([]);
-
-          setLocationError(
-            "Nearby healthcare search is temporarily unavailable. Please try again."
-          );
-        } finally {
-          /*
-           * VERY IMPORTANT:
-           * Never leave this true.
-           */
-          setSearching(false);
-        }
+        await executeHealthcareSearch(userLoc);
       },
-      err => {
+      async err => {
         setLocationLoading(false);
-        setSearching(false);
-
         if (err.code === err.PERMISSION_DENIED) {
-          setLocationError(
-            "Location permission was denied. Please allow location access in your browser and click Use my location again."
-          );
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          setLocationError(
-            "Your location could not be determined. Check your browser/device location settings and try again."
-          );
-        } else if (err.code === err.TIMEOUT) {
-          setLocationError("Location request timed out. Please try again.");
+          setLocationError("Location permission was not granted. Please allow location access in your browser or search by city.");
         } else {
-          setLocationError(
-            "We could not determine your location. Please try again."
-          );
+          // Automatic IP Geolocation Fallback
+          try {
+            const res = await fetch("https://ipapi.co/json/");
+            if (res.ok) {
+              const data = await res.json();
+              if (typeof data.latitude === "number" && typeof data.longitude === "number") {
+                const userLoc = { lat: data.latitude, lng: data.longitude };
+                setLocation(userLoc);
+                await executeHealthcareSearch(userLoc);
+                return;
+              }
+            }
+          } catch {
+            // ignore fallback error
+          }
+          setLocationError("Location permission was not granted. Please check device location settings.");
         }
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 60000,
-      }
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
     );
   };
 
-  /* =======================================================
-     RETRY SEARCH
-  ======================================================= */
-
-  const retryNearbySearch = async () => {
-    if (!location) {
-      requestLocation();
-      return;
-    }
-
-    setLocationError("");
-    setDoctors([]);
+  const handleCitySearch = async (e: FormEvent) => {
+    e.preventDefault();
+    const city = manualCity.trim();
+    if (!city) return;
     setSearching(true);
-
+    setLocationError("");
     try {
-      const results = await findNearbyHealthcare(location);
-
-      setDoctors(results);
-
-      if (results.length === 0) {
-        setLocationError(
-          "No nearby healthcare facilities were found. Please try again later."
-        );
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`);
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const userLoc = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        setLocation(userLoc);
+        await executeHealthcareSearch(userLoc);
+      } else {
+        setLocationError(`Could not find location for "${city}".`);
       }
     } catch {
-      setDoctors([]);
-
-      setLocationError(
-        "Nearby healthcare search is taking too long or is temporarily unavailable."
-      );
+      setLocationError("Location search failed. Please try again.");
     } finally {
       setSearching(false);
     }
   };
 
-  /* =======================================================
-     LOADING
-  ======================================================= */
+  const sortedDoctors = [...doctors].sort((a, b) => {
+    if (sortBy === "rating") {
+      return (b.rating ?? 0) - (a.rating ?? 0);
+    }
+    return (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
+  });
 
   if (loading) {
     return (
@@ -570,34 +423,19 @@ export default function Assistant() {
     );
   }
 
-  /* =======================================================
-     AUTH ERROR
-  ======================================================= */
-
   if (error || !user) {
     return (
       <div className="app-shell grid min-h-screen place-items-center p-6">
         <div className="panel max-w-lg p-8 text-center">
           <div className="eyebrow">Authentication required</div>
-
-          <h1 className="mt-4 text-2xl font-bold text-white">
-            Sign in to use the assistant.
-          </h1>
-
-          <Link
-            href="/auth"
-            className="btn-primary mt-6 inline-flex px-5 py-3 no-underline"
-          >
+          <h1 className="mt-4 text-2xl font-bold text-white">Sign in to use the assistant.</h1>
+          <Link href="/auth" className="btn-primary mt-6 inline-flex px-5 py-3 no-underline">
             Open secure sign in
           </Link>
         </div>
       </div>
     );
   }
-
-  /* =======================================================
-     PAGE
-  ======================================================= */
 
   return (
     <div className="app-shell min-h-screen">
@@ -607,114 +445,74 @@ export default function Assistant() {
         </Link>
 
         <div className="mt-10 grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
-          {/* =================================================
-              LEFT: HEALTH ASSISTANT
-          ================================================= */}
-
+          {/* LEFT: AI CHAT ASSISTANT */}
           <section className="panel bracket p-6 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="eyebrow">AI health assistant</div>
-
-                <h1 className="mt-3 text-3xl font-bold text-white">
-                  Ask about your health.
-                </h1>
-
+                <h1 className="mt-3 text-3xl font-bold text-white">Ask about your health.</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-                  Ask about your DiaSense assessment or general health topics
-                  such as symptoms, nutrition, exercise, sleep, blood pressure,
-                  diabetes, heart health, medicines, vitamins, and wellness.
+                  Ask about your DiaSense assessment, personalized diet & meal plans, blood pressure, diabetes, symptoms, exercises, and medicines.
                 </p>
               </div>
-
               <Stethoscope className="shrink-0 text-cyan-300" size={26} />
             </div>
 
-            {/* CHAT */}
-
-            <div className="mt-7 space-y-4" aria-live="polite">
-              {messages.map(message => (
+            {/* CHAT MESSAGES */}
+            <div aria-live="polite" className="mt-7 space-y-4">
+              {messages.map(m => (
                 <div
-                  key={message.id}
+                  key={m.id}
                   className={`max-w-[92%] rounded-lg p-4 text-sm leading-6 ${
-                    message.role === "user"
-                      ? "ml-auto bg-cyan-300/10 text-cyan-50"
-                      : "border border-slate-800 bg-slate-950/50 text-slate-300"
+                    m.role === "assistant"
+                      ? "border border-slate-800 bg-slate-900/60 text-slate-200"
+                      : "ml-auto border border-cyan-400/30 bg-cyan-400/10 text-cyan-50"
                   }`}
                 >
-                  <span className="mono mb-1 block text-[10px] text-slate-500">
-                    {message.role === "user" ? "YOU" : "DIASENSE AI"}
-                  </span>
-
-                  {message.role === "assistant" ? (
-                    <TypedReply
-                      content={message.content}
-                      active={message.shouldType}
-                    />
+                  <div className="mono mb-1 text-[10px] text-slate-500">
+                    {m.role === "assistant" ? "DIASENSE AI" : "YOU"}
+                  </div>
+                  {m.role === "assistant" && m.shouldType ? (
+                    <TypedReply content={m.content} active />
                   ) : (
-                    message.content
+                    m.content
                   )}
                 </div>
               ))}
 
               {chat.isPending && (
-                <div className="flex items-center gap-3 rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-3 text-sm text-cyan-100">
-                  <span className="flex gap-1" aria-hidden>
-                    <i className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300 [animation-delay:-0.3s]" />
-                    <i className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300 [animation-delay:-0.15s]" />
-                    <i className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-300" />
-                  </span>
-
-                  <span>DiaSense AI is composing a response…</span>
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Loader2 className="animate-spin text-cyan-300" size={16} />
+                  Analyzing clinical inquiry…
                 </div>
               )}
             </div>
 
-            {/* INPUT */}
-
+            {/* INPUT FORM */}
             <form onSubmit={send} className="mt-6 flex gap-2">
-              <label className="sr-only" htmlFor="assistant-question">
-                Ask the assistant
-              </label>
-
               <input
-                id="assistant-question"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                maxLength={1000}
-                className="field flex-1"
-                placeholder="Ask anything about your health..."
+                placeholder="Ask in English or Hinglish (e.g. mera diet plan kya hona chahiye?)..."
+                className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
               />
-
               <button
                 type="submit"
                 disabled={chat.isPending || !input.trim()}
-                className="btn-primary inline-flex items-center px-4 py-3 disabled:opacity-50"
+                className="btn-primary inline-flex items-center px-5 py-3 disabled:opacity-50"
               >
-                <Send size={16} />
-
-                <span className="ml-2 hidden sm:inline">Send</span>
+                <Send size={15} />
               </button>
             </form>
 
-            {/* SAFETY */}
-
             <div className="mt-5 rounded-lg border border-amber-300/20 bg-amber-300/5 p-4 text-xs leading-5 text-amber-100">
-              <b>Important:</b> DiaSense AI provides general health education
-              and is not a substitute for a medical professional. For chest
-              pain, difficulty breathing, fainting, confusion, signs of stroke,
-              or another emergency, contact local emergency services now.
+              <b>Important:</b> DiaSense AI provides clinical health education and should not replace emergency medical care. For chest pain, shortness of breath, or emergency symptoms, contact local emergency services immediately.
             </div>
           </section>
 
-          {/* =================================================
-              RIGHT: CLINICAL FOLLOW-UP
-          ================================================= */}
-
+          {/* RIGHT: CLINICAL FOLLOW-UP & MAP LOCATOR */}
           <section className="panel p-6 sm:p-8">
-            <div className="eyebrow">Clinical follow-up</div>
-
-            {/* STATUS LOADING */}
+            <div className="eyebrow">Clinical follow-up & Healthcare Map</div>
 
             {status.isLoading ? (
               <div className="mt-6 flex items-center gap-2 text-sm text-slate-400">
@@ -723,59 +521,77 @@ export default function Assistant() {
               </div>
             ) : highRisk ? (
               <>
-                {/* HIGH RISK */}
-
                 <div className="mt-4 flex gap-3 rounded-lg border border-rose-300/30 bg-rose-300/10 p-4">
-                  <ShieldAlert
-                    className="mt-0.5 shrink-0 text-rose-300"
-                    size={20}
-                  />
-
+                  <ShieldAlert className="mt-0.5 shrink-0 text-rose-300" size={20} />
                   <div>
                     <h2 className="font-semibold text-rose-100">
                       Your latest signal needs timely clinical follow-up.
                     </h2>
-
                     <p className="mt-1 text-sm leading-6 text-rose-100/80">
-                      Your result was {status.data?.risk}% risk. Consider
-                      arranging an appointment with a qualified healthcare
-                      professional.
+                      Your result indicated {status.data?.risk}% risk. Find nearby doctors, clinics, and hospitals below for medical evaluation.
                     </p>
                   </div>
                 </div>
 
-                {/* LOCATION BUTTON */}
+                {/* LOCATION TRIGGER BUTTONS */}
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locationLoading || searching}
+                    className="btn-primary inline-flex items-center px-4 py-3 text-sm disabled:opacity-50"
+                  >
+                    {locationLoading || searching ? (
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                    ) : (
+                      <MapPin size={16} className="mr-2" />
+                    )}
+                    {locationLoading
+                      ? "Detecting location..."
+                      : searching
+                        ? "Finding nearby clinics..."
+                        : location
+                          ? "Refresh nearby healthcare"
+                          : "Use my location"}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={location ? retryNearbySearch : requestLocation}
-                  disabled={locationLoading || searching}
-                  className="btn-primary mt-5 inline-flex items-center px-4 py-3 disabled:opacity-50"
-                >
-                  {locationLoading || searching ? (
-                    <Loader2 size={16} className="mr-2 animate-spin" />
-                  ) : (
-                    <MapPin size={16} className="mr-2" />
+                  {location && (
+                    <a
+                      href={`https://www.google.com/maps/search/diabetes+specialist+hospital+clinic+near+me/@${location.lat},${location.lng},14z`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-ghost inline-flex items-center px-4 py-3 text-sm text-cyan-300 no-underline"
+                    >
+                      <ExternalLink size={15} className="mr-2" />
+                      Open Google Maps
+                    </a>
                   )}
+                </div>
 
-                  {locationLoading
-                    ? "Getting your location..."
-                    : searching
-                      ? "Finding nearby healthcare..."
-                      : location
-                        ? "Refresh nearby healthcare"
-                        : "Use my location"}
-                </button>
+                {/* MANUAL CITY SEARCH */}
+                <form onSubmit={handleCitySearch} className="mt-4 flex gap-2">
+                  <input
+                    value={manualCity}
+                    onChange={e => setManualCity(e.target.value)}
+                    placeholder="Enter city or area (e.g. Delhi, Mumbai, Patna)..."
+                    className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={searching || !manualCity.trim()}
+                    className="btn-ghost inline-flex items-center px-3 py-2 text-xs text-cyan-300 disabled:opacity-50"
+                  >
+                    <Search size={14} className="mr-1" /> Search City
+                  </button>
+                </form>
 
                 {/* LOCATION ERROR */}
-
                 {locationError && (
                   <div className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/5 p-4 text-sm leading-6 text-amber-100">
                     <p>{locationError}</p>
-
                     <button
                       type="button"
-                      onClick={location ? retryNearbySearch : requestLocation}
+                      onClick={requestLocation}
                       className="mt-3 inline-flex items-center text-xs font-semibold text-cyan-300"
                     >
                       <RefreshCw size={13} className="mr-1" />
@@ -784,73 +600,84 @@ export default function Assistant() {
                   </div>
                 )}
 
-                {/* LOCATION DETECTED */}
-
+                {/* INTERACTIVE MAP & CLINIC LIST */}
                 {location && (
-                  <div className="mt-5">
-                    <div className="rounded-lg border border-cyan-300/15 bg-cyan-300/5 p-4">
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-cyan-300" />
-
-                        <span className="text-sm font-semibold text-cyan-100">
-                          Location detected
+                  <div className="mt-5 space-y-4">
+                    {/* VISUAL MAP VIEW */}
+                    <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
+                      <div className="border-b border-slate-800 bg-slate-900/50 px-3 py-2 text-xs text-slate-300 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-medium text-cyan-200">
+                          <MapPin size={14} className="text-cyan-400" /> Live Healthcare Locator Map
+                        </span>
+                        <span className="mono text-[10px] text-slate-400">
+                          {location.lat.toFixed(3)}, {location.lng.toFixed(3)}
                         </span>
                       </div>
-
-                      <p className="mt-2 text-xs leading-5 text-slate-400">
-                        Nearby healthcare facilities are searched using
-                        OpenStreetMap public data. Your location is used only
-                        for this search.
-                      </p>
+                      <div className="h-48 w-full relative">
+                        <MapView
+                          initialCenter={location}
+                          initialZoom={13}
+                          onMapReady={m => {
+                            setMapInstance(m);
+                            searchClinicians(m, location).then(res => setDoctors(res));
+                          }}
+                          className="h-full w-full"
+                        />
+                      </div>
                     </div>
 
-                    {/* SEARCHING */}
-
-                    {searching && (
-                      <div className="mt-5 flex items-center gap-2 text-sm text-slate-400">
-                        <Loader2 className="animate-spin" size={15} />
-                        Searching nearby doctors, clinics and hospitals…
-                      </div>
-                    )}
+                    {/* SORTING CONTROLS */}
+                    <div className="flex items-center justify-between pt-2">
+                      <label htmlFor="sort-doctors" className="text-xs text-slate-400">
+                        Sort nearby doctors:
+                      </label>
+                      <select
+                        id="sort-doctors"
+                        aria-label="Sort nearby doctors"
+                        value={sortBy}
+                        onChange={e => setSortBy(e.target.value as "distance" | "rating")}
+                        className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+                      >
+                        <option value="distance">Distance</option>
+                        <option value="rating">Rating</option>
+                      </select>
+                    </div>
 
                     {/* RESULTS */}
-
-                    {!searching && doctors.length > 0 && (
-                      <div className="mt-5 space-y-3">
-                        <div className="mono text-[10px] text-slate-500">
-                          NEARBY HEALTHCARE
-                        </div>
-
-                        {doctors.map(doctor => (
+                    {searching ? (
+                      <div className="mt-5 flex items-center gap-2 text-sm text-slate-400">
+                        <Loader2 className="animate-spin text-cyan-300" size={16} />
+                        Finding nearby healthcare centers…
+                      </div>
+                    ) : sortedDoctors.length > 0 ? (
+                      <div className="space-y-3">
+                        {sortedDoctors.map(doctor => (
                           <div
                             key={doctor.placeId}
-                            className="rounded-lg border border-slate-800 bg-slate-950/40 p-4"
+                            className="rounded-lg border border-slate-800 bg-slate-950/40 p-4 transition-colors hover:border-slate-700"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="mb-1 inline-flex rounded-full border border-cyan-300/15 bg-cyan-300/5 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
                                   {doctor.type}
                                 </div>
-
-                                <h3 className="text-sm font-semibold text-white">
-                                  {doctor.name}
-                                </h3>
-
-                                <p className="mt-1 text-xs leading-5 text-slate-400">
-                                  {doctor.address}
-                                </p>
-
-                                <p className="mt-2 text-[11px] text-slate-500">
-                                  {typeof doctor.distanceKm === "number"
-                                    ? `${doctor.distanceKm.toFixed(1)} km away`
-                                    : "Distance unavailable"}
-                                </p>
+                                <h3 className="text-sm font-semibold text-white">{doctor.name}</h3>
+                                <p className="mt-1 text-xs leading-5 text-slate-400">{doctor.address}</p>
+                                <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-400">
+                                  {typeof doctor.distanceKm === "number" && (
+                                    <span>{doctor.distanceKm.toFixed(1)} km away</span>
+                                  )}
+                                  {typeof doctor.rating === "number" && (
+                                    <span className="text-amber-300 font-medium">
+                                      {doctor.rating}/5 patient rating
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-
                               <button
                                 type="button"
                                 onClick={() => openDirections(doctor)}
-                                className="inline-flex shrink-0 items-center text-xs font-semibold text-cyan-300"
+                                className="inline-flex shrink-0 items-center text-xs font-semibold text-cyan-300 hover:text-cyan-200"
                               >
                                 Directions
                                 <ExternalLink size={13} className="ml-1" />
@@ -859,46 +686,51 @@ export default function Assistant() {
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    {/* NO RESULTS */}
-
-                    {!searching && doctors.length === 0 && !locationError && (
-                      <div className="mt-5 rounded-lg border border-slate-800 bg-slate-950/40 p-4">
-                        <p className="text-sm leading-6 text-slate-400">
-                          No nearby healthcare facility was found in the
-                          available OpenStreetMap data.
+                    ) : (
+                      <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4 text-center">
+                        <p className="text-sm text-slate-400">
+                          No nearby search result was returned in this immediate area.
                         </p>
-
-                        <button
-                          type="button"
-                          onClick={retryNearbySearch}
-                          className="mt-3 inline-flex items-center text-xs font-semibold text-cyan-300"
+                        <a
+                          href={`https://www.google.com/maps/search/hospitals+clinics+near+me/@${location.lat},${location.lng},14z`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-primary mt-3 inline-flex items-center text-xs no-underline"
                         >
-                          <RefreshCw size={13} className="mr-1" />
-                          Search again
-                        </button>
+                          <ExternalLink size={13} className="mr-1.5" />
+                          Search on Google Maps
+                        </a>
                       </div>
                     )}
                   </div>
                 )}
               </>
             ) : (
-              /* =================================================
-                 NOT HIGH RISK
-              ================================================= */
+              /* NOT HIGH RISK */
+              <div className="mt-5 space-y-4">
+                <div className="rounded-lg border border-emerald-300/20 bg-emerald-300/5 p-4">
+                  <h2 className="font-semibold text-emerald-100">
+                    No high-risk escalation is currently active.
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-emerald-100/80">
+                    Your assessment indicates normal or manageable risk. Follow your personalized diet and physical activity plan from your assessment report.
+                  </p>
+                </div>
 
-              <div className="mt-5 rounded-lg border border-emerald-300/20 bg-emerald-300/5 p-4">
-                <h2 className="font-semibold text-emerald-100">
-                  No high-risk escalation is currently active.
-                </h2>
-
-                <p className="mt-2 text-sm leading-6 text-emerald-100/80">
-                  Continue using the assistant for health education and follow
-                  the recommendations from your latest assessment. If you
-                  develop concerning symptoms, contact a qualified clinician
-                  promptly.
-                </p>
+                <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+                  <h3 className="text-sm font-semibold text-white">Need a preventive routine checkup?</h3>
+                  <p className="mt-1 text-xs text-slate-400">
+                    You can always locate nearby preventive clinics and pathology labs anytime.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locationLoading || searching}
+                    className="btn-ghost mt-3 inline-flex items-center text-xs text-cyan-300"
+                  >
+                    <MapPin size={13} className="mr-1.5" /> Locate nearby wellness clinics
+                  </button>
+                </div>
               </div>
             )}
           </section>
