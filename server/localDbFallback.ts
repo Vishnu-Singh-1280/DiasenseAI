@@ -63,7 +63,15 @@ export const localDb = {
     const store = loadStore();
     const existingIndex = store.users.findIndex(u => u.openId === user.openId);
     if (existingIndex >= 0) {
-      store.users[existingIndex] = { ...store.users[existingIndex], ...user, lastSignedIn: new Date() };
+      const existing = store.users[existingIndex];
+      const updated = { ...existing };
+      for (const [k, v] of Object.entries(user)) {
+        if (v !== undefined) {
+          updated[k] = v;
+        }
+      }
+      updated.lastSignedIn = new Date();
+      store.users[existingIndex] = updated;
     } else {
       const id = store.users.length + 1;
       store.users.push({ id, ...user, role: user.role ?? "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() });

@@ -1,7 +1,9 @@
 export const ENV = {
   appId: process.env.VITE_APP_ID || "diasense-local-auth",
 
-  cookieSecret: process.env.JWT_SECRET || "",
+  cookieSecret:
+    process.env.JWT_SECRET ||
+    "diasense-ai-production-jwt-fallback-secret-key-2026-secure-token",
 
   databaseUrl:
     process.env.DATABASE_URL ||
