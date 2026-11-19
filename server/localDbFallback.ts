@@ -41,18 +41,6 @@ const SEED_USERS = [
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     lastSignedIn: new Date(),
   },
-  {
-    id: 3,
-    openId: "local:demo@diasense.ai",
-    name: "Demo Patient",
-    email: "demo@diasense.ai",
-    passwordHash: "scrypt:ebcc57b750af829235921fd11ec17c92:3d340b37c5f7fe458d1d60ec13066163d5126e8dfb540083df6ca23e1ef0a5e681616ef27c56a3952d565e8bb8b6b841483d03ff4c2bc01fc12bd9fec3e75327",
-    loginMethod: "password",
-    role: "user",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    updatedAt: new Date("2026-01-01T00:00:00Z"),
-    lastSignedIn: new Date(),
-  },
 ];
 
 function getEmptyStore(): DbStore {

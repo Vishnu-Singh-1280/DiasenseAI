@@ -87,7 +87,7 @@ export const appRouter = router({
         z.object({
           name: z.string().min(2).max(120),
           email: z.string().email().max(320),
-          password: z.string().min(10).max(128),
+          password: z.string().min(6).max(128),
         })
       )
       .mutation(async ({ ctx, input }) => {

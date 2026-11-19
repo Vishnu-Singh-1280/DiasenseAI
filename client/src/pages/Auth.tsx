@@ -31,13 +31,6 @@ export default function Auth() {
     }
   };
 
-  const fillDemo = () => {
-    setMode("login");
-    setEmail("admin@diasense.ai");
-    setPassword("Password123!");
-    setError("");
-  };
-
   const pending = login.isPending || register.isPending;
 
   return (
@@ -72,23 +65,11 @@ export default function Auth() {
             </h2>
             <p className="mt-2 text-sm text-slate-400">
               {mode === "login"
-                ? "Enter your email and password to sign in."
-                : "Create an account with name, email, and password (10+ characters)."}
+                ? "Sign in with your registered email and password."
+                : "Create an account with your name, email, and password."}
             </p>
 
-            {/* Quick 1-click Demo Account */}
-            <div className="mt-4 flex items-center justify-between rounded-lg border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs text-slate-300">
-              <span><b>Demo:</b> admin@diasense.ai</span>
-              <button
-                type="button"
-                onClick={fillDemo}
-                className="rounded bg-cyan-300/20 px-2.5 py-1 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-300/30"
-              >
-                1-Click Demo Fill
-              </button>
-            </div>
-
-            <form className="mt-6 space-y-4" onSubmit={submit}>
+            <form className="mt-7 space-y-4" onSubmit={submit}>
               {mode === "register" && (
                 <label className="block text-sm text-slate-300">
                   Full name
@@ -120,12 +101,12 @@ export default function Auth() {
                 <div className="relative">
                   <input
                     required
-                    minLength={mode === "register" ? 10 : 1}
+                    minLength={mode === "register" ? 6 : 1}
                     className={`${input} pr-10`}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     type={showPassword ? "text" : "password"}
-                    placeholder={mode === "register" ? "10+ characters (e.g. Password123!)" : "••••••••"}
+                    placeholder={mode === "register" ? "At least 6 characters" : "••••••••"}
                   />
                   <button
                     type="button"
