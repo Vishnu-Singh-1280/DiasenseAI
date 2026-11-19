@@ -47,23 +47,41 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) return localDb.getUserByOpenId(openId);
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result[0];
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+      if (result[0]) return result[0];
+    } catch (e) {
+      console.warn('[Database] getUserByOpenId query fallback:', e);
+    }
+  }
+  return localDb.getUserByOpenId(openId);
 }
 
 export async function getUserByEmail(email: string) {
   const db = await getDb();
-  if (!db) return localDb.getUserByEmail(email);
-  const result = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
-  return result[0];
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
+      if (result[0]) return result[0];
+    } catch (e) {
+      console.warn('[Database] getUserByEmail query fallback:', e);
+    }
+  }
+  return localDb.getUserByEmail(email);
 }
 
 export async function createLocalUser(input: { name: string; email: string; passwordHash: string }) {
   const db = await getDb();
-  if (!db) return localDb.createLocalUser(input);
-  const result = await db.insert(users).values({ openId: `local:${input.email.toLowerCase()}`, name: input.name, email: input.email.toLowerCase(), passwordHash: input.passwordHash, loginMethod: 'password' }).$returningId();
-  return result[0]?.id;
+  if (db) {
+    try {
+      const result = await db.insert(users).values({ openId: `local:${input.email.toLowerCase()}`, name: input.name, email: input.email.toLowerCase(), passwordHash: input.passwordHash, loginMethod: 'password' }).$returningId();
+      if (result[0]?.id) return result[0].id;
+    } catch (e) {
+      console.warn('[Database] createLocalUser MySQL fallback to localDb:', e);
+    }
+  }
+  return localDb.createLocalUser(input);
 }
 
 export async function updatePassword(userId: number, passwordHash: string) {

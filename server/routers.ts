@@ -91,7 +91,8 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const email = input.email.toLowerCase();
+        const cleanName = input.name.trim();
+        const email = input.email.trim().toLowerCase();
 
         if (await getUserByEmail(email)) {
           throw new TRPCError({
@@ -102,7 +103,7 @@ export const appRouter = router({
         }
 
         const id = await createLocalUser({
-          name: input.name,
+          name: cleanName,
           email,
           passwordHash: await hashPassword(input.password),
         });
@@ -136,20 +137,27 @@ export const appRouter = router({
     login: publicProcedure
       .input(
         z.object({
-          email: z.string().email(),
+          email: z.string().trim().min(1).max(320),
           password: z.string().min(1).max(128),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const user = await getUserByEmail(input.email);
+        const cleanEmail = input.email.trim().toLowerCase();
+        let user = await getUserByEmail(cleanEmail);
 
-        if (
-          !user?.passwordHash ||
-          !(await verifyPassword(
-            input.password,
-            user.passwordHash
-          ))
-        ) {
+        if (!user) {
+          user = await getUserByOpenId(`local:${cleanEmail}`);
+        }
+
+        let valid = false;
+        if (user?.passwordHash) {
+          valid = await verifyPassword(input.password, user.passwordHash);
+          if (!valid && input.password.trim() !== input.password) {
+            valid = await verifyPassword(input.password.trim(), user.passwordHash);
+          }
+        }
+
+        if (!valid || !user) {
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: "Invalid email or password",

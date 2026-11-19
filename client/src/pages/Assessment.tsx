@@ -232,8 +232,7 @@ export default function Assessment() {
         activity,
         familyHistory,
 
-        pregnancyStatus:
-          gender === "female" ? pregnancyStatus : undefined,
+        pregnancyStatus: gender === "female" ? pregnancyStatus : undefined,
       },
       {
         onSuccess: setResult,

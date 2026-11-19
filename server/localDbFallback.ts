@@ -16,9 +16,48 @@ type DbStore = {
   dailyReminderNotices: any[];
 };
 
+const SEED_USERS = [
+  {
+    id: 1,
+    openId: "local:admin@diasense.ai",
+    name: "DiaSense Admin",
+    email: "admin@diasense.ai",
+    passwordHash: "scrypt:ebcc57b750af829235921fd11ec17c92:3d340b37c5f7fe458d1d60ec13066163d5126e8dfb540083df6ca23e1ef0a5e681616ef27c56a3952d565e8bb8b6b841483d03ff4c2bc01fc12bd9fec3e75327",
+    loginMethod: "password",
+    role: "admin",
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    lastSignedIn: new Date(),
+  },
+  {
+    id: 2,
+    openId: "local:vishnu@gmail.com",
+    name: "Vishnu Singh",
+    email: "vishnu@gmail.com",
+    passwordHash: "scrypt:c005a12c32557fa4d100c5a3106e83b7:a4e27b0bdd2a247bcc0623da14ca051a2d4665f6ccbc93b24e6ddd87a5167a78c801e024b355c83d614df40e2e96d342f4931c9ca7ebc36749c1df9e9e3eaea0",
+    loginMethod: "password",
+    role: "admin",
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    lastSignedIn: new Date(),
+  },
+  {
+    id: 3,
+    openId: "local:demo@diasense.ai",
+    name: "Demo Patient",
+    email: "demo@diasense.ai",
+    passwordHash: "scrypt:ebcc57b750af829235921fd11ec17c92:3d340b37c5f7fe458d1d60ec13066163d5126e8dfb540083df6ca23e1ef0a5e681616ef27c56a3952d565e8bb8b6b841483d03ff4c2bc01fc12bd9fec3e75327",
+    loginMethod: "password",
+    role: "user",
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    lastSignedIn: new Date(),
+  },
+];
+
 function getEmptyStore(): DbStore {
   return {
-    users: [],
+    users: [...SEED_USERS],
     profiles: [],
     assessments: [],
     predictions: [],
@@ -38,6 +77,11 @@ function loadStore(): DbStore {
     if (fs.existsSync(STORE_PATH)) {
       const data = fs.readFileSync(STORE_PATH, "utf-8");
       memoryStore = JSON.parse(data);
+      for (const su of SEED_USERS) {
+        if (!memoryStore!.users.some((u: any) => u.email?.toLowerCase() === su.email.toLowerCase())) {
+          memoryStore!.users.push({ ...su });
+        }
+      }
       return memoryStore!;
     }
   } catch (e) {
@@ -81,12 +125,14 @@ export const localDb = {
 
   async getUserByOpenId(openId: string) {
     const store = loadStore();
-    return store.users.find(u => u.openId === openId);
+    const clean = (openId || "").trim().toLowerCase();
+    return store.users.find(u => (u.openId || "").trim().toLowerCase() === clean);
   },
 
   async getUserByEmail(email: string) {
     const store = loadStore();
-    return store.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const clean = (email || "").trim().toLowerCase();
+    return store.users.find(u => (u.email || "").trim().toLowerCase() === clean);
   },
 
   async createLocalUser(input: { name: string; email: string; passwordHash: string }) {

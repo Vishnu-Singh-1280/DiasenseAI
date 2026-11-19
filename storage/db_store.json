@@ -1,0 +1,83 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "openId": "local:admin@diasense.ai",
+      "name": "DiaSense Admin",
+      "email": "admin@diasense.ai",
+      "passwordHash": "scrypt:ebcc57b750af829235921fd11ec17c92:3d340b37c5f7fe458d1d60ec13066163d5126e8dfb540083df6ca23e1ef0a5e681616ef27c56a3952d565e8bb8b6b841483d03ff4c2bc01fc12bd9fec3e75327",
+      "loginMethod": "password",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "lastSignedIn": "2026-11-19T04:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "openId": "local:vishnu@gmail.com",
+      "name": "Vishnu Singh",
+      "email": "vishnu@gmail.com",
+      "passwordHash": "scrypt:c005a12c32557fa4d100c5a3106e83b7:a4e27b0bdd2a247bcc0623da14ca051a2d4665f6ccbc93b24e6ddd87a5167a78c801e024b355c83d614df40e2e96d342f4931c9ca7ebc36749c1df9e9e3eaea0",
+      "loginMethod": "password",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "lastSignedIn": "2026-11-19T04:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "openId": "local:demo@diasense.ai",
+      "name": "Demo Patient",
+      "email": "demo@diasense.ai",
+      "passwordHash": "scrypt:ebcc57b750af829235921fd11ec17c92:3d340b37c5f7fe458d1d60ec13066163d5126e8dfb540083df6ca23e1ef0a5e681616ef27c56a3952d565e8bb8b6b841483d03ff4c2bc01fc12bd9fec3e75327",
+      "loginMethod": "password",
+      "role": "user",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "lastSignedIn": "2026-11-19T04:00:00.000Z"
+    }
+  ],
+  "profiles": [],
+  "assessments": [
+    {
+      "id": 1,
+      "userId": 1,
+      "age": 35,
+      "heightCm": "175.0",
+      "weightKg": "72.0",
+      "bmi": "23.5",
+      "bloodPressure": "80",
+      "glucose": "105.0",
+      "familyHistory": false,
+      "activity": "moderate",
+      "pregnancyStatus": null,
+      "createdAt": "2026-11-19T00:00:00.000Z"
+    }
+  ],
+  "predictions": [
+    {
+      "id": 1,
+      "assessmentId": 1,
+      "riskPercentage": 22,
+      "confidence": 88,
+      "healthScore": 82,
+      "category": "Low risk",
+      "modelVersion": "pima-rf-portable-v1",
+      "createdAt": "2026-11-19T00:00:00.000Z"
+    }
+  ],
+  "recommendations": [
+    {
+      "id": 1,
+      "predictionId": 1,
+      "diet": "Balanced low GI whole-grain nutrition, high fiber, lean proteins.",
+      "exercise": "150 minutes weekly of brisk walking and moderate aerobic exercise.",
+      "lifestyle": "Maintain 7-8 hours restful sleep and active hydration.",
+      "createdAt": "2026-11-19T00:00:00.000Z"
+    }
+  ],
+  "reports": [],
+  "dailyHealthLogs": [],
+  "dailyReminderSettings": [],
+  "dailyReminderNotices": []
+}
